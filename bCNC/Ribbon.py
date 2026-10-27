@@ -87,7 +87,7 @@ class LabelGroup(Frame):
                 foreground=_FOREGROUND_GROUP,
                 background=_BACKGROUND_GROUP,
                 highlightthickness=0,
-                borderwidth=0,
+                borderwidth=2,
                 pady=0,
                 compound=RIGHT,
             )
@@ -680,6 +680,19 @@ class TabRibbonFrame(Frame):
             self.oldActive = None
 
     # ----------------------------------------------------------------------
+    # Same ribbon height on all pages
+    # ----------------------------------------------------------------------
+    def _fixHeight(self):
+        self.update_idletasks()
+        height = max(
+            frame.winfo_reqheight()
+            for page in self.pages.values()
+            for frame, args in page.ribbons
+        )
+        self._ribbonFrame.pack_propagate(False)
+        self._ribbonFrame.config(height=height)
+
+    # ----------------------------------------------------------------------
     # Change ribbon and page
     # ----------------------------------------------------------------------
     def changePage(self, page=None):
@@ -703,6 +716,8 @@ class TabRibbonFrame(Frame):
 
         for frame, args in page.ribbons:
             frame.pack(in_=self._ribbonFrame, **args)
+
+        self._fixHeight()
 
         for frame, args in page.frames:
             frame.pack(in_=self._pageFrame, **args)
