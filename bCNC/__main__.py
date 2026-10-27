@@ -42,6 +42,8 @@ def usage(rc):
 
 # -----------------------------------------------------------------------------
 def main():
+    import tkinter
+
     import bmain
     import tkExtra
     import Utils
@@ -149,9 +151,17 @@ def main():
         elif opt == "--run":
             run = True
 
+    # Background for entries and tables.
+    control_bg = Utils.getStr("Color", "global.controlbackground", None)
+    if (control_bg is not None) and (control_bg.strip() != ""):
+        tkExtra.GLOBAL_CONTROL_BACKGROUND = control_bg.strip()
+
     application = bmain.Application(className=f"  {Utils.__prg__}  ")
 
     palette = {"background": application.cget("background")}
+
+    # Used when the option is missing or empty in the config
+    default_colors = {"background": "#D5D2D0"}
 
     color_count = 0
     custom_color_count = 0
@@ -167,6 +177,8 @@ def main():
         "selectForeground",
     ):
         color2 = Utils.getStr("Color", "global." + color_name.lower(), None)
+        if (color2 is None) or (color2.strip() == ""):
+            color2 = default_colors.get(color_name)
         color_count += 1
         if (color2 is not None) and (color2.strip() != ""):
             palette[color_name] = color2.strip()
@@ -179,7 +191,23 @@ def main():
 
     if custom_color_count > 0:
         print("Changing palette")
+        explicit = (tkExtra.GLOBAL_CONTROL_BACKGROUND,)
+        controls = []
+
+        def findControls(widget):
+            try:
+                color = widget.cget("background")
+                if color in explicit:
+                    controls.append((widget, "background", color))
+            except tkinter.TclError:
+                pass
+            for child in widget.winfo_children():
+                findControls(child)
+
+        findControls(application)
         application.tk_setPalette(**palette)
+        for widget, option, color in controls:
+            widget.config(**{option: color})
 
     if fullscreen:
         application.attributes("-fullscreen", True)

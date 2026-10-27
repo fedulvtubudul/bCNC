@@ -102,7 +102,7 @@ from tkinter.colorchooser import askcolor
 import bFileDialog
 import Unicode
 
-GLOBAL_CONTROL_BACKGROUND = "White"
+GLOBAL_CONTROL_BACKGROUND = "#FFFFFF"
 ARROW_LEFT = "\u2190"
 ARROW_UP = "\u2191"
 ARROW_RIGHT = "\u2192"
