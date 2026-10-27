@@ -161,7 +161,11 @@ def main():
     palette = {"background": application.cget("background")}
 
     # Used when the option is missing or empty in the config
-    default_colors = {"background": "#D5D2D0"}
+    default_colors = {
+        "background": "#D5D2D0",
+        "selectBackground": "#B6B2B0",
+        "selectForeground": "#000000",
+    }
 
     color_count = 0
     custom_color_count = 0
@@ -191,8 +195,14 @@ def main():
 
     if custom_color_count > 0:
         print("Changing palette")
-        explicit = (tkExtra.GLOBAL_CONTROL_BACKGROUND,)
+        # tk_setPalette overrides explicit colors, remember them to restore
+        explicit = (
+            tkExtra.GLOBAL_CONTROL_BACKGROUND,
+            bmain.Ribbon._BACKGROUND_DISABLE,
+            bmain.Ribbon._BACKGROUND,
+        )
         controls = []
+        tabs = []
 
         def findControls(widget):
             try:
@@ -201,6 +211,10 @@ def main():
                     controls.append((widget, "background", color))
             except tkinter.TclError:
                 pass
+            if isinstance(
+                widget, (bmain.Ribbon.TabButton, bmain.Ribbon.LabelRadiobutton)
+            ):
+                tabs.append(widget)
             for child in widget.winfo_children():
                 findControls(child)
 
@@ -208,6 +222,8 @@ def main():
         application.tk_setPalette(**palette)
         for widget, option, color in controls:
             widget.config(**{option: color})
+        for tab in tabs:
+            tab.refresh()
 
     if fullscreen:
         application.attributes("-fullscreen", True)

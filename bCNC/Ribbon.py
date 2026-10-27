@@ -3,6 +3,7 @@
 # Date: 18-Jun-2015
 
 from tkinter import (
+    TclError,
     FALSE,
     YES,
     TRUE,
@@ -37,7 +38,8 @@ _TABFONT = ("Sans", "-14", "bold")
 _FONT = ("Sans", "-11")
 
 _BACKGROUND_DISABLE = "#A6A2A0"
-_BACKGROUND = "#E6E2E0"
+_BACKGROUND_TAB_SELECT = "#E5E2E0"
+_BACKGROUND = "#E5E2E0"
 _BACKGROUND_GROUP = "#B6B2B0"
 
 _BACKGROUND_GROUP2 = "#B0C0C0"
@@ -137,11 +139,66 @@ class _KeyboardFocus:
 
 
 # =============================================================================
+# Flat button drawn as a Label, some systems ignore the button background
+# =============================================================================
+class _FlatButton(Label):
+    def __init__(self, master, command=None, **kw):
+        self._command = command
+        kw.setdefault("takefocus", True)
+        Label.__init__(self, master, **kw)
+        self.bindtags((str(self), "RibbonFlatButton") + self.bindtags()[1:])
+        self.bind_class("RibbonFlatButton", "<ButtonRelease-1>", _FlatButton._click)
+        self.bind("<space>", lambda e: self.invoke())
+
+    # -----------------------------------------------------------------------
+    @staticmethod
+    def _click(event):
+        button = event.widget
+        if not isinstance(button, _FlatButton):
+            return
+        if 0 <= event.x < button.winfo_width() and 0 <= event.y < button.winfo_height():
+            button.invoke()
+
+    # -----------------------------------------------------------------------
+    def configure(self, cnf=None, **kw):
+        if "command" in kw:
+            self._command = kw.pop("command")
+            if cnf is None and not kw:
+                return None
+        return Label.configure(self, cnf, **kw)
+
+    config = configure
+
+    # -----------------------------------------------------------------------
+    def __setitem__(self, key, value):
+        if key == "command":
+            self._command = value
+        else:
+            Label.__setitem__(self, key, value)
+
+    # -----------------------------------------------------------------------
+    def cget(self, key):
+        if key == "command":
+            return self._command
+        return Label.cget(self, key)
+
+    __getitem__ = cget
+
+    # -----------------------------------------------------------------------
+    def invoke(self):
+        if str(self.cget("state")) == DISABLED:
+            return None
+        if self._command is not None:
+            return self._command()
+        return None
+
+
+# =============================================================================
 # Button with Label that generates a Virtual Event or calls a command
 # =============================================================================
-class LabelButton(Button, _KeyboardFocus):
+class LabelButton(_FlatButton, _KeyboardFocus):
     def __init__(self, master, recipient=None, event=None, **kw):
-        Button.__init__(self, master, **kw)
+        _FlatButton.__init__(self, master, **kw)
         self.config(
             relief=FLAT,
             activebackground=_ACTIVE_COLOR,
@@ -185,20 +242,69 @@ class LabelCheckbutton(Checkbutton, _KeyboardFocus):
 
 
 # =============================================================================
-class LabelRadiobutton(Radiobutton, _KeyboardFocus):
-    def __init__(self, master, **kw):
-        Radiobutton.__init__(self, master, **kw)
+class LabelRadiobutton(_FlatButton, _KeyboardFocus):
+    def __init__(self, master, variable=None, value=None, **kw):
+        self._variable = variable
+        self._value = value
+        self._focus = False
+        _FlatButton.__init__(self, master, **kw)
         self.config(
-            selectcolor=_LABEL_SELECT_COLOR,
             activebackground=_ACTIVE_COLOR,
             background=_BACKGROUND,
-            indicatoron=FALSE,
             borderwidth=0,
             highlightthickness=0,
             pady=0,
             font=_FONT,
         )
         _KeyboardFocus._bind(self)
+        if self._variable is not None:
+            self._variable.trace_add("write", self._changed)
+        self.refresh()
+
+    # -----------------------------------------------------------------------
+    def configure(self, cnf=None, **kw):
+        if "variable" in kw:
+            self._variable = kw.pop("variable")
+        if "value" in kw:
+            self._value = kw.pop("value")
+        return _FlatButton.configure(self, cnf, **kw)
+
+    config = configure
+
+    # -----------------------------------------------------------------------
+    def invoke(self):
+        if str(self.cget("state")) == DISABLED:
+            return None
+        if self._variable is not None:
+            self._variable.set(self._value)
+        return _FlatButton.invoke(self)
+
+    # -----------------------------------------------------------------------
+    def _changed(self, *args):
+        try:
+            self.refresh()
+        except TclError:
+            pass
+
+    # -----------------------------------------------------------------------
+    def refresh(self):
+        if self._focus:
+            color = _ACTIVE_COLOR
+        elif self._variable is not None and self._variable.get() == self._value:
+            color = _LABEL_SELECT_COLOR
+        else:
+            color = _BACKGROUND
+        Label.configure(self, background=color)
+
+    # -----------------------------------------------------------------------
+    def _focusIn(self, event):
+        self._focus = True
+        self.refresh()
+
+    # -----------------------------------------------------------------------
+    def _focusOut(self, event):
+        self._focus = False
+        self.refresh()
 
 
 # =============================================================================
@@ -218,9 +324,9 @@ class LabelCombobox(tkExtra.Combobox, _KeyboardFocus):
 # =============================================================================
 # Button with Label that popup a menu
 # =============================================================================
-class MenuButton(Button, _KeyboardFocus):
+class MenuButton(_FlatButton, _KeyboardFocus):
     def __init__(self, master, menulist, **kw):
-        Button.__init__(self, master, **kw)
+        _FlatButton.__init__(self, master, **kw)
         self.config(
             relief=FLAT,
             activebackground=_ACTIVE_COLOR,
@@ -303,23 +409,66 @@ class MenuGroup(LabelGroup):
 # =============================================================================
 # Page Tab buttons
 # =============================================================================
-class TabButton(Radiobutton):
-    def __init__(self, master, **kw):
-        Radiobutton.__init__(self, master, **kw)
+class TabButton(Label):
+    def __init__(self, master, variable, value, command=None, **kw):
+        Label.__init__(self, master, **kw)
+        self._variable = variable
+        self._value = value
+        self._command = command
+        self._focus = False
+        self._hover = False
         self.config(
-            selectcolor=_BACKGROUND,
-            activebackground=_ACTIVE_COLOR,
-            indicatoron=FALSE,
             relief=FLAT,
             font=_TABFONT,
             borderwidth=0,
             highlightthickness=0,
             padx=5,
             pady=0,
-            background=_BACKGROUND_DISABLE,
+            takefocus=True,
         )
+        self.bindtags((str(self), "RibbonTabButton") + self.bindtags()[1:])
+        self.bind_class("RibbonTabButton", "<ButtonRelease-1>", TabButton._click)
         self.bind("<FocusIn>", self._focusIn)
         self.bind("<FocusOut>", self._focusOut)
+        self.bind("<Enter>", self._enter)
+        self.bind("<Leave>", self._leave)
+        self._variable.trace_add("write", self.refresh)
+        self.refresh()
+
+    # -----------------------------------------------------------------------
+    @staticmethod
+    def _click(event):
+        tab = event.widget
+        if not isinstance(tab, TabButton):
+            return
+        if 0 <= event.x < tab.winfo_width() and 0 <= event.y < tab.winfo_height():
+            tab.invoke()
+
+    # -----------------------------------------------------------------------
+    def invoke(self):
+        self._variable.set(self._value)
+        if self._command is not None:
+            self._command()
+
+    # -----------------------------------------------------------------------
+    def refresh(self, *args):
+        if self._variable.get() == self._value:
+            color = _ACTIVE_COLOR if self._focus else _BACKGROUND_TAB_SELECT
+        elif self._hover:
+            color = _ACTIVE_COLOR
+        else:
+            color = _BACKGROUND_DISABLE
+        self.config(background=color)
+
+    # -----------------------------------------------------------------------
+    def _enter(self, event=None):
+        self._hover = True
+        self.refresh()
+
+    # -----------------------------------------------------------------------
+    def _leave(self, event=None):
+        self._hover = False
+        self.refresh()
 
     # -----------------------------------------------------------------------
     # Bind events on TabFrame
@@ -337,11 +486,13 @@ class TabButton(Radiobutton):
 
     # ----------------------------------------------------------------------
     def _focusIn(self, evenl=None):
-        self.config(selectcolor=_ACTIVE_COLOR)
+        self._focus = True
+        self.refresh()
 
     # ----------------------------------------------------------------------
     def _focusOut(self, evenl=None):
-        self.config(selectcolor=_BACKGROUND)
+        self._focus = False
+        self.refresh()
 
 
 # =============================================================================

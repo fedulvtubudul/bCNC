@@ -752,6 +752,18 @@ class Application(Tk, Sender):
         Ribbon._LABEL_SELECT_COLOR = Utils.getStr(
             "Color", "ribbon.select", Ribbon._LABEL_SELECT_COLOR
         )
+        Ribbon._BACKGROUND = (
+            Utils.getStr("Color", "ribbon.background", "").strip()
+            or Ribbon._BACKGROUND
+        )
+        Ribbon._BACKGROUND_DISABLE = (
+            Utils.getStr("Color", "ribbon.tabbackground", "").strip()
+            or Ribbon._BACKGROUND_DISABLE
+        )
+        Ribbon._BACKGROUND_TAB_SELECT = (
+            Utils.getStr("Color", "ribbon.tabselect", "").strip()
+            or Ribbon._BACKGROUND_TAB_SELECT
+        )
 
         self.tools.loadConfig()
         Sender.loadConfig(self)
